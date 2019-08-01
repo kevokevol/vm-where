@@ -1,6 +1,11 @@
 import numpy as np
 import cv2
 import sys
+import time
+
+from native_db_cnt import insertIntoDB
+
+TICK = 3
 
 def train_bg(bg, cap, num=500):
     '''
@@ -62,9 +67,10 @@ def main():
     bg = cv2.cvtColor(bg, cv2.COLOR_BGR2GRAY)
     bg = train_bg(bg, cap, num=100)
 
-    print(bg.shape[:2])
-
     cv2.VideoCapture.set(cap, cv2.CAP_PROP_POS_MSEC, 0)
+
+    start = time.time()
+    numticks = 0
 
     while(True):
         # Capture frame-by-frame
@@ -74,29 +80,26 @@ def main():
             break
 
         # Our operations on the frame come here
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        frame = cv2.absdiff(gray, bg)
-
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        frame = cv2.absdiff(frame, bg)
         ret, frame= cv2.threshold(frame,20,255,cv2.THRESH_TOZERO)
-
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-
         frame = cv2.morphologyEx(frame, cv2.MORPH_OPEN, kernel)
-
         frame = cv2.morphologyEx(frame, cv2.MORPH_CLOSE, kernel, iterations = 2)
-
-        frame = cv2.erode(frame,kernel,iterations = 2)
-
         frame = cv2.dilate(frame, kernel, iterations = 2)
-
+        frame = cv2.erode(frame,kernel,iterations = 2)
         ret, frame = cv2.threshold(frame,100,255,cv2.THRESH_BINARY)
-
+        frame = cv2.erode(frame,kernel,iterations = 1)
         matches, contours = detect_vehicles(frame)
-
         cv2.drawContours(frame, contours, -1, (0,255,0), 3)
 
-        print(len(matches))
+        numcars = len(matches)
+
+        elapsed = time.time() - start
+        if int(elapsed) == numticks:
+            print(numcars)
+            insertIntoDB('prom', numcars)
+            numticks += TICK
 
         cv2.imshow('frame',frame)
 
