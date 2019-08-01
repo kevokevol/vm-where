@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 import sys
 import time
+import asyncio
 
 from native_db_cnt import insertIntoDB
 
@@ -98,7 +99,7 @@ def main():
         elapsed = time.time() - start
         if int(elapsed) == numticks:
             print(numcars)
-            insertIntoDB('prom', numcars)
+            asyncio.run(insertIntoDB('prom', numcars))
             numticks += TICK
 
         cv2.imshow('frame',frame)

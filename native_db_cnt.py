@@ -2,6 +2,7 @@ import datetime
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
+import asyncio
 
 # Use a service account CHANGE THIS TO THE PATH OF YOUR OWN CERTIFICATE
 cred = credentials.Certificate('./roketto-dan-firebase-adminsdk-1tvwb-a77cbc7880.json')
@@ -20,7 +21,7 @@ def readFromDB(collection):
         print(u'{} => {}'.format(doc.id, doc.to_dict()))
 
 
-def insertIntoDB(collection, numCars):
+async def insertIntoDB(collection, numCars):
     """
     Inserts current time and number of cars into the database with the respective
     collection and document categories
