@@ -1,7 +1,13 @@
 import numpy as np
 import cv2
+import sys
+import time
 
-def train_bg_subtractor(inst, cap, num=500):
+from native_db_cnt import insertIntoDB
+
+TICK = 3
+
+def train_bg(bg, cap, num=500):
     '''
         BG substractor need process some amount of frames to start giving result
     '''
@@ -10,11 +16,12 @@ def train_bg_subtractor(inst, cap, num=500):
     while(True):
         # Capture frame-by-frame
         ret, frame = cap.read()
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        inst.apply(frame, None, 0.001)
+        bg = cv2.addWeighted(bg,0.5,frame,0.5,0)
         i += 1
         if i >= num or not ret:
-            return cap
+            return bg
 
 def get_centroid(x, y, w, h):
     x1 = int(w / 2)
@@ -25,7 +32,7 @@ def get_centroid(x, y, w, h):
 
     return (cx, cy)
 
-def detect_vehicles(fg_mask, min_contour_width=35, min_contour_height=35, max_contour_width=300, max_contour_height=200):
+def detect_vehicles(fg_mask, min_contour_width=35, min_contour_height=35, max_contour_width=400, max_contour_height=400):
 
     matches = []
 
@@ -50,23 +57,20 @@ def detect_vehicles(fg_mask, min_contour_width=35, min_contour_height=35, max_co
     return matches, contours
 
 def main():
-    cap = cv2.VideoCapture("./img/vid3.mp4")
-    #cap = cv2.VideoCapture(1)
+    if sys.argv[1].isnumeric():
+        vid = int(sys.argv[1])
+    else:
+        vid = sys.argv[1]
+    cap = cv2.VideoCapture(vid)
 
-    # bg_subtractor = cv2.createBackgroundSubtractorMOG2(
-    #     history=2000, detectShadows=True)
-
-    # train_bg_subtractor(bg_subtractor, cap, num=100)
-
-    ret, first = cap.read()
-
-    print(first.shape[:2])
-
-    # Save the first image as reference
-    first_gray = cv2.cvtColor(first, cv2.COLOR_BGR2GRAY)
-
+    ret, bg = cap.read()
+    bg = cv2.cvtColor(bg, cv2.COLOR_BGR2GRAY)
+    bg = train_bg(bg, cap, num=100)
 
     cv2.VideoCapture.set(cap, cv2.CAP_PROP_POS_MSEC, 0)
+
+    start = time.time()
+    numticks = 0
 
     while(True):
         # Capture frame-by-frame
@@ -76,34 +80,26 @@ def main():
             break
 
         # Our operations on the frame come here
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        # Display the resulting frame
-        #cv2.imshow('frame',gray)
-
-        # bg_subtractor.apply(frame, None, 0.001)
-
-        # frame = bg_subtractor.apply(frame, None, 0.001)
-
-        frame = cv2.absdiff(gray, first_gray)
-
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
-
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        frame = cv2.absdiff(frame, bg)
+        ret, frame= cv2.threshold(frame,20,255,cv2.THRESH_TOZERO)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         frame = cv2.morphologyEx(frame, cv2.MORPH_OPEN, kernel)
-
-        frame = cv2.morphologyEx(frame, cv2.MORPH_CLOSE, kernel)
-
-        frame = cv2.erode(frame,kernel,iterations = 5)
-
-        frame = cv2.dilate(frame, kernel, iterations=2)
-
-        ret, frame = cv2.threshold(frame,50,255,cv2.THRESH_BINARY)
-
+        frame = cv2.morphologyEx(frame, cv2.MORPH_CLOSE, kernel, iterations = 2)
+        frame = cv2.dilate(frame, kernel, iterations = 2)
+        frame = cv2.erode(frame,kernel,iterations = 2)
+        ret, frame = cv2.threshold(frame,100,255,cv2.THRESH_BINARY)
+        frame = cv2.erode(frame,kernel,iterations = 1)
         matches, contours = detect_vehicles(frame)
-
         cv2.drawContours(frame, contours, -1, (0,255,0), 3)
 
-        print(len(matches))
+        numcars = len(matches)
+
+        elapsed = time.time() - start
+        if int(elapsed) == numticks:
+            print(numcars)
+            insertIntoDB('prom', numcars)
+            numticks += TICK
 
         cv2.imshow('frame',frame)
 

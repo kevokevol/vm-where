@@ -4,7 +4,7 @@ from firebase_admin import credentials
 from firebase_admin import firestore
 
 # Use a service account CHANGE THIS TO THE PATH OF YOUR OWN CERTIFICATE
-cred = credentials.Certificate('/Users/andrewchen/Androo/firebase_test/roketto-dan-firebase-adminsdk-1tvwb-a77cbc7880.json')
+cred = credentials.Certificate('./roketto-dan-firebase-adminsdk-1tvwb-a77cbc7880.json')
 firebase_admin.initialize_app(cred)
 
 db = firestore.client()
